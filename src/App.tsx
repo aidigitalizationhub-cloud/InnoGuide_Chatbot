@@ -110,7 +110,7 @@ export default function App() {
         } catch {
           const errorText = await response.text();
           if (errorText) {
-            errorMessage = errorText;
+            errorMessage = `${response.status} ${response.statusText}: ${errorText.slice(0, 250)}`;
           }
         }
         throw new Error(errorMessage);

@@ -1,3 +1,5 @@
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+
 const SOURCES = [
   "https://rid.ug.edu.gh/news",
   "https://orid1.ug.edu.gh/news/",
@@ -27,7 +29,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 204,
@@ -66,7 +68,6 @@ exports.handler = async (event) => {
       };
     }
 
-    const { GoogleGenAI, ThinkingLevel } = await import("@google/genai");
     const ai = new GoogleGenAI({ apiKey });
     const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
@@ -103,7 +104,9 @@ Be concise, accurate, and use Markdown.`,
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: JSON.stringify({ error: error?.message || "Internal Server Error" }),
+      body: JSON.stringify({
+        error: error?.message || "Internal Server Error",
+      }),
     };
   }
 };

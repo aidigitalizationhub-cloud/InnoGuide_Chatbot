@@ -1,5 +1,3 @@
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
-
 const SOURCES = [
   "https://rid.ug.edu.gh/news",
   "https://orid1.ug.edu.gh/news/",
@@ -29,13 +27,58 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+function toContents(history, message) {
+  const safeHistory = Array.isArray(history) ? history : [];
+  const contents = safeHistory
+    .filter((msg) => msg && typeof msg.content === "string" && msg.content.trim())
+    .map((msg) => ({
+      role: msg.role === "user" ? "user" : "model",
+      parts: [{ text: msg.content }],
+    }));
+  contents.push({ role: "user", parts: [{ text: message }] });
+  return contents;
+}
+
+async function callGemini({ apiKey, model, contents }) {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents,
+      systemInstruction: {
+        parts: [
+          {
+            text: `You are InnoGuide, an expert assistant for the University of Ghana and the IAST Virtual Innovation Hub.
+Use these sources as grounding references when relevant: ${SOURCES.join(", ")}
+Be concise, accurate, and use Markdown.`,
+          },
+        ],
+      },
+      generationConfig: {
+        temperature: 0.4,
+      },
+    }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    const message = data?.error?.message || `Gemini request failed (${response.status})`;
+    throw new Error(message);
+  }
+
+  const text = data?.candidates?.[0]?.content?.parts
+    ?.map((p) => p?.text || "")
+    .join("")
+    .trim();
+
+  return text || "";
+}
+
 export const handler = async (event) => {
   if (event.httpMethod === "OPTIONS") {
-    return {
-      statusCode: 204,
-      headers: corsHeaders,
-      body: "",
-    };
+    return { statusCode: 204, headers: corsHeaders, body: "" };
   }
 
   if (event.httpMethod !== "POST") {
@@ -59,6 +102,7 @@ export const handler = async (event) => {
     const body = JSON.parse(event.body || "{}");
     const message = typeof body.message === "string" ? body.message.trim() : "";
     const history = Array.isArray(body.history) ? body.history : [];
+    const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
     if (!message) {
       return {
@@ -68,51 +112,13 @@ export const handler = async (event) => {
       };
     }
 
-    const ai = new GoogleGenAI({ apiKey });
-    const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-
-    const contents = history
-      .filter((msg) => msg?.content && typeof msg.content === "string")
-      .map((msg) => ({
-        role: msg.role === "user" ? "user" : "model",
-        parts: [{ text: msg.content }],
-      }));
-
-    contents.push({ role: "user", parts: [{ text: message }] });
-
-    let response;
-    try {
-      response = await ai.models.generateContent({
-        model,
-        contents,
-        config: {
-          systemInstruction: `You are InnoGuide, an expert assistant for the University of Ghana and the IAST Virtual Innovation Hub.
-If useful, use urlContext with these sources: ${SOURCES.join(", ")}
-Be concise, accurate, and use Markdown.`,
-          tools: [{ urlContext: {} }],
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-        },
-      });
-    } catch (primaryError) {
-      // Fallback for runtimes/models that reject tools or thinking config.
-      response = await ai.models.generateContent({
-        model,
-        contents,
-        config: {
-          systemInstruction: `You are InnoGuide for the University of Ghana and IAST Virtual Innovation Hub.
-Use only verified facts. If uncertain, state limitations clearly.
-Be concise and use Markdown.`,
-        },
-      });
-    }
+    const contents = toContents(history, message);
+    const text = await callGemini({ apiKey, model, contents });
 
     return {
       statusCode: 200,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ text: response?.text || "" }),
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
     };
   } catch (error) {
     return {
@@ -120,7 +126,6 @@ Be concise and use Markdown.`,
       headers: corsHeaders,
       body: JSON.stringify({
         error: error?.message || "Internal Server Error",
-        hint: "Check Netlify environment variable GEMINI_API_KEY and Function logs.",
       }),
     };
   }

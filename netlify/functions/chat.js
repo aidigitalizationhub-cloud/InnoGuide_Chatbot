@@ -80,17 +80,31 @@ export const handler = async (event) => {
 
     contents.push({ role: "user", parts: [{ text: message }] });
 
-    const response = await ai.models.generateContent({
-      model,
-      contents,
-      config: {
-        systemInstruction: `You are InnoGuide, an expert assistant for the University of Ghana and the IAST Virtual Innovation Hub.
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model,
+        contents,
+        config: {
+          systemInstruction: `You are InnoGuide, an expert assistant for the University of Ghana and the IAST Virtual Innovation Hub.
 If useful, use urlContext with these sources: ${SOURCES.join(", ")}
 Be concise, accurate, and use Markdown.`,
-        tools: [{ urlContext: {} }],
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-      },
-    });
+          tools: [{ urlContext: {} }],
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        },
+      });
+    } catch (primaryError) {
+      // Fallback for runtimes/models that reject tools or thinking config.
+      response = await ai.models.generateContent({
+        model,
+        contents,
+        config: {
+          systemInstruction: `You are InnoGuide for the University of Ghana and IAST Virtual Innovation Hub.
+Use only verified facts. If uncertain, state limitations clearly.
+Be concise and use Markdown.`,
+        },
+      });
+    }
 
     return {
       statusCode: 200,
@@ -106,6 +120,7 @@ Be concise, accurate, and use Markdown.`,
       headers: corsHeaders,
       body: JSON.stringify({
         error: error?.message || "Internal Server Error",
+        hint: "Check Netlify environment variable GEMINI_API_KEY and Function logs.",
       }),
     };
   }

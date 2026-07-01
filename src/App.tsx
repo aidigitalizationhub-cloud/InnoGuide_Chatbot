@@ -246,7 +246,7 @@ export default function App() {
             </div>
 
             <div className="p-4 border-t border-slate-100">
-              <div className="bg-slate-50 rounded-xl p-3 text-xs text-slate-500">Powered by Gemini and curated UG sources.</div>
+              <div className="bg-slate-50 rounded-xl p-3 text-xs text-slate-500">Powered by Virtual Innovation Hub of IAST.</div>
             </div>
           </motion.aside>
         )}

@@ -91,7 +91,8 @@ async function startServer() {
         config: {
           systemInstruction: `You are InnoGuide, an expert assistant for the University of Ghana and the IAST Virtual Innovation Hub.
 If useful, you may use urlContext with these sources: ${SOURCES.join(", ")}
-Be concise, accurate, and use Markdown.`,
+Be concise, accurate, and use Markdown.
+When you include sources, format them as Markdown links like - [Title or URL](https://example.com). Do not list naked URLs.`,
           tools: [{ urlContext: {} }],
           thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         },

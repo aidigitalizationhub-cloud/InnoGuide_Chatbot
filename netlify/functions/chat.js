@@ -204,9 +204,9 @@ async function callGemini({ apiKey, model, contents, liveContext, useTools = tru
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents,
-      systemInstruction: {
-        parts: [
-          {
+          systemInstruction: {
+            parts: [
+              {
             text: `You are InnoGuide, an expert assistant for the University of Ghana and the IAST Virtual Innovation Hub.
 Use these approved sources as grounding references: ${SOURCES.join(", ")}
 
@@ -216,7 +216,7 @@ ${liveContext}
 Response rules:
 1) Give a detailed, accurate answer with clear sections and bullet points.
 2) Prioritize facts from the live context. If a fact is uncertain, state that explicitly.
-3) End with a "Sources" section listing URLs you relied on.
+3) End with a "Sources" section. Each source must be a Markdown link in the form - [Title or URL](https://example.com). Do not use naked URLs.
 4) If the question asks for steps/processes, provide step-by-step guidance.
 5) Do not invent UG programs, offices, names, or dates.
 6) For external/current info, use web context tools and cite URLs.

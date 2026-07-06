@@ -31,6 +31,62 @@ function appendTextToMessage(messageId: string, text: string, setMessages: React
   );
 }
 
+function linkifyPlainUrls(text: string) {
+  const urlPattern = /(?<!\]\()https?:\/\/[^\s<>()]+/g;
+  return text.replace(urlPattern, (url) => `[${url}](${url})`);
+}
+
+interface SourceItem {
+  label: string;
+  href: string;
+}
+
+function extractSourceItems(lines: string[]) {
+  const items: SourceItem[] = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+
+    const linkMatch = line.match(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/);
+    if (linkMatch) {
+      items.push({ label: linkMatch[1].trim(), href: linkMatch[2].trim() });
+      continue;
+    }
+
+    const urlMatch = line.match(/https?:\/\/[^\s<>()]+/);
+    if (urlMatch) {
+      const href = urlMatch[0].trim();
+      items.push({ label: line.replace(/^[-*]\s*/, "").replace(/^\d+\.\s*/, "").trim() || href, href });
+    }
+  }
+
+  return items;
+}
+
+function splitAssistantContent(content: string) {
+  const normalized = content.replace(/\r\n/g, "\n").trim();
+  const lines = normalized.split("\n");
+  let sourceStart = -1;
+
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (/^(#{1,3}\s*)?(sources|references)\s*:?\s*$/i.test(lines[i].trim())) {
+      sourceStart = i;
+      break;
+    }
+  }
+
+  if (sourceStart === -1) {
+    return { body: normalized, sources: [] as SourceItem[] };
+  }
+
+  const body = lines.slice(0, sourceStart).join("\n").trim();
+  const sources = extractSourceItems(lines.slice(sourceStart + 1));
+  return { body, sources };
+}
+
 export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -237,9 +293,70 @@ export default function App() {
                       : "bg-white border border-slate-200 shadow-sm rounded-tl-none"
                   }`}
                 >
-                  <div className={`prose prose-sm max-w-none ${message.role === "user" ? "prose-invert" : "text-slate-700"}`}>
-                    <Markdown>{message.content}</Markdown>
-                  </div>
+                  {message.role === "assistant" ? (() => {
+                    const { body, sources } = splitAssistantContent(message.content);
+                    return (
+                      <div className="space-y-3">
+                        {body && (
+                          <div className="prose prose-sm max-w-none text-slate-700">
+                            <Markdown
+                              components={{
+                                a: ({ href, children }) => (
+                                  <a href={href || "#"} target="_blank" rel="noreferrer noopener">
+                                    {children}
+                                  </a>
+                                ),
+                              }}
+                            >
+                              {linkifyPlainUrls(body)}
+                            </Markdown>
+                          </div>
+                        )}
+
+                        {sources.length > 0 && (
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 sm:p-4">
+                            <div className="flex items-center justify-between gap-3 mb-3">
+                              <div>
+                                <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                                  Sources
+                                </h4>
+                                <p className="text-[11px] text-slate-400 mt-1">
+                                  Click a source to open it in a new tab.
+                                </p>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              {sources.map((source, idx) => (
+                                <a
+                                  key={`${source.href}-${idx}`}
+                                  href={source.href}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition-all hover:border-indigo-300 hover:bg-indigo-50/60"
+                                >
+                                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 font-semibold text-xs">
+                                    {idx + 1}
+                                  </span>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block font-medium text-slate-800 truncate">
+                                      {source.label}
+                                    </span>
+                                    <span className="block text-[11px] text-slate-400 truncate group-hover:text-indigo-500">
+                                      {source.href}
+                                    </span>
+                                  </span>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })() : (
+                    <div className="prose prose-sm max-w-none prose-invert">
+                      <Markdown>{message.content}</Markdown>
+                    </div>
+                  )}
                 </div>
                 <span className="text-[10px] text-slate-400 px-1">
                   {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -290,4 +407,3 @@ export default function App() {
     </div>
   );
 }
-

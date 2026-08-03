@@ -17,6 +17,8 @@ interface Message {
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 const CHAT_ENDPOINT = `${API_BASE_URL}/api/chat`;
+const TEMPORARY_HICCUP_MESSAGE =
+  "Oops! I ran into a temporary hiccup processing that request. Please try asking your question again in a few moments, or check out our **News & Updates** section in the main menu while you wait, or explore research projects directly on the  **Hub**'**s** page.";
 
 const starterPrompts = [
   "What's the latest news from RID?",
@@ -216,11 +218,10 @@ export default function App() {
         }
       }
     } catch (error: any) {
-      const message = error?.message || "Unexpected error";
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantMessageId
-            ? { ...msg, content: `I'm sorry, I encountered an error: ${message}. Please try again later.` }
+            ? { ...msg, content: TEMPORARY_HICCUP_MESSAGE }
             : msg,
         ),
       );
